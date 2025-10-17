@@ -10,8 +10,8 @@ project:
 tts:
   language: "ru"  # ru | en
   models:
-    ru: "tts_models/ru/ruslan/fairseq_vits"
-    en: "tts_models/en/ljspeech/tacotron2-DDC"
+    multilingual: "tts_models/multilingual/multi-dataset/xtts_v2"
+    en: "tts_models/en/ljspeech/vits"
   speed: 1.0  # Скорость речи (0.5 - 2.0)
 
 # Настройки видео
