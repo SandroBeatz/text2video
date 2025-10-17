@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Text-to-Video Generator
-Главная точка входа в приложение
+Main entry point for the application
 """
 
 import sys
@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def main():
-    """Основная функция приложения"""
+    """Main application function"""
     print("=" * 50)
     print("Text2Video Generator")
     print("=" * 50)

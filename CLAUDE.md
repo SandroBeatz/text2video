@@ -235,10 +235,33 @@ Before implementing features, review these documents to understand the intended 
 5. Create corresponding tests in `tests/` directory
 6. Update `config.yaml` if new configuration options are needed
 
+### Language Policy
+
+**IMPORTANT: All code must be in English, all documentation in Russian**
+
+- **Code (Python files)**: All comments, docstrings, variable names, function names, and code instructions MUST be in English
+- **Documentation (.md files)**: All documentation files, tasks, and project descriptions MUST be in Russian
+- **Exception**: This CLAUDE.md file is in English (for AI assistants)
+
+Examples:
+```python
+# ✅ CORRECT
+def parse_scene(text: str) -> Scene:
+    """Parse text and return Scene object"""
+    # Split by paragraphs
+    ...
+
+# ❌ WRONG
+def parse_scene(text: str) -> Scene:
+    """Парсит текст и возвращает объект Scene"""
+    # Разделить по абзацам
+    ...
+```
+
 ### Code Style Expectations
 
 - Use type hints for all function parameters and return values
-- Include docstrings for all classes and public methods
+- Include docstrings for all classes and public methods (in English)
 - Follow the pipeline pattern - each module processes and passes data forward
 - Use dataclasses for structured data (like Scene)
 - Prefer composition over inheritance

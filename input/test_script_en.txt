@@ -1,0 +1,9 @@
+Welcome to the world of automated video creation!
+This system allows you to turn any text into a complete video.
+
+Second scene of our test.
+Voice-over is generated automatically using text-to-speech technology.
+Each scene gets its own audio and visual design.
+
+Final scene.
+Everything works great and is ready to use!
