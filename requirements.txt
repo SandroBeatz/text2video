@@ -1,0 +1,25 @@
+# Text-to-Video Generator - Production Dependencies
+
+# TTS (Text-to-Speech)
+TTS>=0.22.0
+
+# Video Processing
+moviepy>=1.0.3
+
+# Audio Processing
+pydub>=0.25.1
+
+# Subtitle Generation
+pysrt>=1.1.2
+
+# Image Processing
+Pillow>=10.0.0
+
+# Configuration
+PyYAML>=6.0
+
+# Numerical Operations
+numpy>=1.24.0
+
+# Progress Bars
+tqdm>=4.65.0
