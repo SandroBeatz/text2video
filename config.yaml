@@ -1,0 +1,68 @@
+# Text-to-Video Generator - Configuration
+
+# Общие настройки проекта
+project:
+  name: "Text2Video Generator"
+  version: "1.0.0"
+  output_dir: "./output"
+
+# Настройки TTS (Text-to-Speech)
+tts:
+  language: "ru"  # ru | en
+  models:
+    ru: "tts_models/ru/ruslan/fairseq_vits"
+    en: "tts_models/en/ljspeech/tacotron2-DDC"
+  speed: 1.0  # Скорость речи (0.5 - 2.0)
+
+# Настройки видео
+video:
+  fps: 30
+  resolution:
+    width: 1920
+    height: 1080
+  aspect_ratio: "16:9"  # 16:9 | 9:16 | 1:1
+  codec: "libx264"
+  bitrate: "5000k"
+
+# Настройки субтитров
+subtitles:
+  enabled: true
+  font: "Arial"
+  font_size: 48
+  color: "white"
+  outline_color: "black"
+  outline_width: 2
+  position: "bottom"  # top | center | bottom
+  max_chars_per_line: 40
+
+# Настройки аудио
+audio:
+  music:
+    enabled: true
+    volume: 0.2  # Громкость музыки относительно речи (0.0 - 1.0)
+    fade_in: 2.0  # Плавное появление (секунды)
+    fade_out: 3.0  # Плавное затухание (секунды)
+  voice:
+    volume: 1.0
+    normalize: true  # Нормализация громкости
+
+# Настройки визуального ряда
+visuals:
+  images_dir: "./assets/images"
+  default_duration: 5  # Длительность показа изображения (сек) если нет речи
+  transition:
+    enabled: false  # Переходы между сценами (будет реализовано позже)
+    type: "crossfade"  # crossfade | fade | none
+    duration: 0.5  # Длительность перехода (секунды)
+
+# Пути к ресурсам
+paths:
+  music_dir: "./assets/music"
+  fonts_dir: "./assets/fonts"
+  temp_dir: "./temp"
+
+# Логирование
+logging:
+  level: "INFO"  # DEBUG | INFO | WARNING | ERROR
+  file: "./logs/app.log"
+  console: true
