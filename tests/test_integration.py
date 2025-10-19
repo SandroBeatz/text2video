@@ -9,6 +9,10 @@ import yaml
 from pathlib import Path
 from modules.scene_parser import SceneParser
 from modules.tts_generator import TTSGenerator
+from modules.subtitle_generator import SubtitleGenerator
+from modules.visual_selector import VisualSelector
+from modules.music_selector import MusicSelector
+from modules.video_assembler import VideoAssembler
 
 
 class TestSceneParserTTSIntegration:
@@ -191,3 +195,250 @@ class TestSceneParserTTSIntegration:
             assert scene.audio_path is not None
             assert os.path.exists(scene.audio_path)
             assert scene.duration > 0
+
+
+class TestFullPipelineIntegration:
+    """Integration tests for the complete pipeline (all 7 steps)"""
+
+    @pytest.fixture
+    def config(self):
+        """Load configuration from config.yaml"""
+        config_path = Path(__file__).parent.parent / "config.yaml"
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+
+    @pytest.fixture
+    def test_script_path(self, tmp_path):
+        """Create a temporary test script file"""
+        script_path = tmp_path / "test_script.txt"
+        script_path.write_text(
+            "First test scene.\n"
+            "This is a simple test.\n\n"
+            "Second test scene.\n"
+            "It has multiple lines too.",
+            encoding='utf-8'
+        )
+        return str(script_path)
+
+    @pytest.fixture
+    def test_images_dir(self, tmp_path):
+        """Create test images"""
+        from PIL import Image
+
+        images_dir = tmp_path / "test_images"
+        images_dir.mkdir()
+
+        # Create 3 test images
+        for i in range(1, 4):
+            img = Image.new('RGB', (1920, 1080), color=(100*i, 100*i, 100*i))
+            img.save(images_dir / f"test_image_{i}.jpg")
+
+        return str(images_dir)
+
+    @pytest.fixture
+    def test_music_dir(self, tmp_path):
+        """Create test music files"""
+        from pydub import AudioSegment
+        from pydub.generators import Sine
+
+        music_dir = tmp_path / "test_music"
+        music_dir.mkdir()
+
+        # Create a test music file (5 seconds)
+        tone = Sine(440).to_audio_segment(duration=5000)
+        tone.export(music_dir / "test_music.mp3", format="mp3")
+
+        return str(music_dir)
+
+    def test_pipeline_step_by_step_without_tts(self, config, test_script_path,
+                                                 test_images_dir, tmp_path):
+        """
+        Test pipeline steps without TTS (using mock audio)
+        Tests: Parse -> Subtitles -> Visuals -> (skip Music) -> (skip Assembly)
+        """
+        # Step 1: Parse
+        parser = SceneParser()
+        scenes = parser.parse(test_script_path)
+        assert len(scenes) == 2
+
+        # Mock audio data (simulate TTS output)
+        for i, scene in enumerate(scenes):
+            # Create mock audio file
+            from pydub import AudioSegment
+            from pydub.generators import Sine
+
+            audio_dir = tmp_path / "audio"
+            audio_dir.mkdir(exist_ok=True)
+
+            # Create 3 second audio
+            audio = Sine(440).to_audio_segment(duration=3000)
+            audio_path = audio_dir / f"scene_{scene.id:03d}_audio.wav"
+            audio.export(audio_path, format="wav")
+
+            scene.audio_path = str(audio_path)
+            scene.duration = 3.0
+
+        # Step 3: Generate subtitles
+        subtitle_generator = SubtitleGenerator(config)
+        subtitle_dir = tmp_path / "subtitles"
+        subtitle_dir.mkdir()
+
+        subtitle_generator.batch_generate(scenes, str(subtitle_dir))
+
+        for scene in scenes:
+            assert scene.subtitle_path is not None
+            assert os.path.exists(scene.subtitle_path)
+            assert scene.subtitle_path.endswith('.srt')
+
+        # Step 4: Select and scale images
+        visual_selector = VisualSelector(config)
+        images_output_dir = tmp_path / "images"
+        images_output_dir.mkdir()
+
+        visual_selector.batch_process(scenes, test_images_dir, str(images_output_dir))
+
+        for scene in scenes:
+            assert scene.image_path is not None
+            assert os.path.exists(scene.image_path)
+
+    @pytest.mark.skipif(
+        not os.path.exists('./venv/lib/python3.11/site-packages/TTS'),
+        reason="TTS library not installed - full pipeline test requires TTS"
+    )
+    def test_full_pipeline_with_tts(self, config, test_script_path,
+                                    test_images_dir, test_music_dir, tmp_path):
+        """
+        Test complete pipeline with TTS
+        All 7 steps: Parse -> TTS -> Subtitles -> Visuals -> Music -> Assembly
+
+        This test requires:
+        - TTS library installed
+        - TTS models downloaded
+        - FFmpeg installed
+        """
+        # Adjust config to use test resources
+        config['visuals']['images_dir'] = test_images_dir
+        config['paths']['music_dir'] = test_music_dir
+        config['audio']['music']['enabled'] = True
+
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
+        # Step 1: Parse text
+        parser = SceneParser()
+        scenes = parser.parse(test_script_path)
+        assert len(scenes) == 2
+
+        # Step 2: Generate audio (TTS)
+        tts_generator = TTSGenerator(config)
+        audio_output_dir = tmp_path / "audio"
+        audio_output_dir.mkdir()
+
+        tts_generator.batch_generate(scenes, str(audio_output_dir))
+
+        total_duration = sum(scene.duration for scene in scenes)
+        assert total_duration > 0
+
+        # Step 3: Generate subtitles
+        subtitle_generator = SubtitleGenerator(config)
+        subtitle_output_dir = tmp_path / "subtitles"
+        subtitle_output_dir.mkdir()
+
+        subtitle_generator.batch_generate(scenes, str(subtitle_output_dir))
+
+        # Step 4: Select and scale images
+        visual_selector = VisualSelector(config)
+        images_output_dir = tmp_path / "images"
+        images_output_dir.mkdir()
+
+        visual_selector.batch_process(scenes, test_images_dir, str(images_output_dir))
+
+        # Step 5: Process music
+        music_selector = MusicSelector(config)
+        music_output_dir = tmp_path / "music"
+        music_output_dir.mkdir()
+
+        selected_music = music_selector.select_music(test_music_dir)
+        music_path = music_selector.adjust_duration(
+            selected_music,
+            total_duration,
+            str(music_output_dir)
+        )
+
+        # Step 6: Assemble video
+        video_assembler = VideoAssembler(config)
+        output_path = output_dir / "test_video.mp4"
+
+        final_video = video_assembler.assemble(
+            scenes=scenes,
+            output_path=str(output_path),
+            background_music_path=music_path
+        )
+
+        # Verify final video
+        assert os.path.exists(final_video)
+        assert os.path.getsize(final_video) > 0
+        assert final_video.endswith('.mp4')
+
+        # Verify video info
+        video_info = video_assembler.get_video_info(final_video)
+        assert video_info['duration'] > 0
+        assert video_info['width'] == config['video']['resolution']['width']
+        assert video_info['height'] == config['video']['resolution']['height']
+
+    def test_pipeline_without_music(self, config, test_script_path,
+                                    test_images_dir, tmp_path):
+        """
+        Test pipeline without background music
+        Tests: Parse -> Mock Audio -> Subtitles -> Visuals -> Assembly (no music)
+        """
+        # Disable music in config
+        config['audio']['music']['enabled'] = False
+        config['visuals']['images_dir'] = test_images_dir
+
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
+        # Step 1: Parse
+        parser = SceneParser()
+        scenes = parser.parse(test_script_path)
+
+        # Create mock audio
+        from pydub import AudioSegment
+        from pydub.generators import Sine
+
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+
+        for scene in scenes:
+            audio = Sine(440).to_audio_segment(duration=3000)
+            audio_path = audio_dir / f"scene_{scene.id:03d}_audio.wav"
+            audio.export(audio_path, format="wav")
+            scene.audio_path = str(audio_path)
+            scene.duration = 3.0
+
+        # Step 3: Subtitles
+        subtitle_generator = SubtitleGenerator(config)
+        subtitle_dir = tmp_path / "subtitles"
+        subtitle_dir.mkdir()
+        subtitle_generator.batch_generate(scenes, str(subtitle_dir))
+
+        # Step 4: Visuals
+        visual_selector = VisualSelector(config)
+        images_dir = tmp_path / "images"
+        images_dir.mkdir()
+        visual_selector.batch_process(scenes, test_images_dir, str(images_dir))
+
+        # Step 6: Assemble (without music)
+        video_assembler = VideoAssembler(config)
+        output_path = output_dir / "test_video_no_music.mp4"
+
+        final_video = video_assembler.assemble(
+            scenes=scenes,
+            output_path=str(output_path),
+            background_music_path=None  # No music
+        )
+
+        # Verify
+        assert os.path.exists(final_video)
+        assert os.path.getsize(final_video) > 0

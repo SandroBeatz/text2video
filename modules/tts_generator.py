@@ -86,10 +86,13 @@ class TTSGenerator:
             # Generate speech
             # Check if model is multilingual (XTTS)
             if "xtts" in self.model_name.lower():
+                # XTTS requires speaker parameter
+                # Use default speaker "Claribel Dervla" for English-like quality
                 self.tts.tts_to_file(
                     text=scene.text,
                     file_path=output_path,
-                    language=self.language
+                    language=self.language,
+                    speaker="Claribel Dervla"  # Default XTTS speaker
                 )
             else:
                 self.tts.tts_to_file(
