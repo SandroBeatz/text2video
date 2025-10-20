@@ -97,6 +97,7 @@ class VideoAssembler:
 
             # Add background music if provided
             if background_music_path and os.path.exists(background_music_path):
+                print(f"   Adding background music: {background_music_path}")
                 background_music = AudioFileClip(background_music_path)
 
                 # Adjust music duration to match video
@@ -114,11 +115,19 @@ class VideoAssembler:
                 # Mix background music with existing audio
                 # Background music at lower volume
                 music_volume = self.config.get('audio', {}).get('music', {}).get('volume', 0.2)
+                print(f"   Applying music volume: {music_volume}")
                 background_music = background_music.with_volume_scaled(music_volume)
 
                 # Composite audio (original audio + background music)
+                print(f"   Mixing background music with voice audio...")
                 final_audio = CompositeAudioClip([final_video.audio, background_music])
                 final_video = final_video.with_audio(final_audio)
+                print(f"   ✓ Background music added to video")
+            else:
+                if background_music_path:
+                    print(f"   ⚠ Background music file not found: {background_music_path}")
+                else:
+                    print(f"   ⊘ No background music provided")
 
             # Create output directory if needed
             output_dir = os.path.dirname(output_path)

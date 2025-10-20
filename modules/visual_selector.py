@@ -4,9 +4,10 @@ Handles image selection and scaling for video scenes
 """
 
 import os
+import re
 import random
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from PIL import Image
 from modules.scene_parser import Scene
 
@@ -32,6 +33,7 @@ class VisualSelector:
 
         self.images_dir = visuals_config.get('images_dir', './assets/images')
         self.default_duration = visuals_config.get('default_duration', 5)
+        self.selection_mode = visuals_config.get('selection_mode', 'random')
 
         # Get target resolution from config
         resolution = video_config.get('resolution', {})
@@ -94,6 +96,107 @@ class VisualSelector:
                 image_files.append(filepath)
 
         return sorted(image_files)  # Sort for consistent ordering
+
+    def _parse_image_filename(self, filename: str) -> Tuple[Optional[int], Optional[float]]:
+        """
+        Parse image filename to extract scene number and optional duration
+
+        Args:
+            filename: Image filename (e.g., '1.jpg', 'scene-2.jpg', '3_5.jpg', 'scene-4_10.5.jpg')
+
+        Returns:
+            Tuple of (scene_number, duration)
+            - scene_number: int if found, None otherwise
+            - duration: float if found in filename, None otherwise
+
+        Supported formats:
+            - 1.jpg -> (1, None)
+            - scene-2.jpg -> (2, None)
+            - 3_5.jpg -> (3, 5.0)
+            - scene-4_10.5.jpg -> (4, 10.5)
+            - image_1_3.5.jpg -> (1, 3.5)
+        """
+        base_name = os.path.splitext(filename)[0]  # Remove extension
+
+        # Try to extract duration (format: _NUMBER or _NUMBER.NUMBER before extension)
+        duration = None
+        duration_match = re.search(r'_(\d+(?:\.\d+)?)$', base_name)
+        if duration_match:
+            duration = float(duration_match.group(1))
+            # Remove duration part for scene number extraction
+            base_name = base_name[:duration_match.start()]
+
+        # Try to extract scene number
+        # Pattern 1: scene-NUMBER or scene_NUMBER
+        scene_match = re.search(r'scene[-_](\d+)', base_name, re.IGNORECASE)
+        if scene_match:
+            scene_number = int(scene_match.group(1))
+            return (scene_number, duration)
+
+        # Pattern 2: Just NUMBER at start or end
+        number_match = re.search(r'^\d+$|^(\d+)[-_]|[-_](\d+)$', base_name)
+        if number_match:
+            # Extract the number from whichever group matched
+            number_str = number_match.group(1) or number_match.group(2) or number_match.group(0)
+            scene_number = int(number_str)
+            return (scene_number, duration)
+
+        # No scene number found
+        return (None, duration)
+
+    def select_image_ordered(
+        self,
+        scene: Scene,
+        images_dir: str = None
+    ) -> Tuple[str, Optional[float]]:
+        """
+        Select image based on scene number from filename
+
+        Args:
+            scene: Scene object with id
+            images_dir: Directory containing images
+
+        Returns:
+            Tuple of (image_path, duration)
+            - image_path: Path to selected image
+            - duration: Duration from filename if specified, None otherwise
+
+        Raises:
+            FileNotFoundError: If no matching image found for scene number
+        """
+        if images_dir is None:
+            images_dir = self.images_dir
+
+        if not os.path.exists(images_dir):
+            raise FileNotFoundError(f"Images directory not found: {images_dir}")
+
+        # Get all image files
+        image_files = self._get_image_files(images_dir)
+
+        if not image_files:
+            raise FileNotFoundError(
+                f"No images found in {images_dir}. "
+                f"Supported formats: {self.SUPPORTED_FORMATS}"
+            )
+
+        # Parse all filenames and create mapping
+        scene_images = {}  # scene_number -> (image_path, duration)
+        for image_path in image_files:
+            filename = os.path.basename(image_path)
+            scene_number, duration = self._parse_image_filename(filename)
+
+            if scene_number is not None:
+                scene_images[scene_number] = (image_path, duration)
+
+        # Find image for this scene
+        if scene.id in scene_images:
+            return scene_images[scene.id]
+        else:
+            raise FileNotFoundError(
+                f"No image found for scene {scene.id}. "
+                f"Expected filename formats: {scene.id}.jpg, scene-{scene.id}.jpg, or {scene.id}_DURATION.jpg. "
+                f"Available scene numbers: {sorted(scene_images.keys())}"
+            )
 
     def scale_image(
         self,
@@ -201,14 +304,23 @@ class VisualSelector:
             output_dir: Directory to save scaled images
 
         Note:
-            This method updates each scene's image_path
+            This method updates each scene's image_path and duration (if specified in filename)
         """
         if output_dir is None:
             output_dir = os.path.join(self.config.get('paths', {}).get('temp_dir', './temp'), 'images')
 
         for scene in scenes:
-            # Select image
-            image_path = self.select_image(scene, images_dir)
+            # Select image based on mode
+            if self.selection_mode == 'ordered':
+                # Ordered selection: match by scene number in filename
+                image_path, custom_duration = self.select_image_ordered(scene, images_dir)
+
+                # Apply custom duration if specified in filename
+                if custom_duration is not None:
+                    scene.duration = custom_duration
+            else:
+                # Random selection (default)
+                image_path = self.select_image(scene, images_dir)
 
             # Scale image
             scaled_image_path = self.scale_image(image_path, output_dir=output_dir)

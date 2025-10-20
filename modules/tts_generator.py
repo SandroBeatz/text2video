@@ -32,6 +32,8 @@ class TTSGenerator:
         self.config = config
         self.language = config.get('tts', {}).get('language', 'ru')
         self.speed = config.get('tts', {}).get('speed', 1.0)
+        self.speaker = config.get('tts', {}).get('speaker', 'default')
+        self.speaker_audio = config.get('tts', {}).get('speaker_audio', {})
 
         # Get model name for the language
         models = config.get('tts', {}).get('models', self.MODELS)
@@ -71,6 +73,37 @@ class TTSGenerator:
                     language=self.language,
                     details=str(e)
                 )
+
+    def _get_speaker_audio_path(self) -> Optional[str]:
+        """
+        Get the path to speaker audio file based on selected speaker
+
+        Returns:
+            Path to speaker audio file, or None if using default XTTS speaker
+
+        Raises:
+            ResourceNotFoundError: If speaker audio file doesn't exist
+        """
+        # If speaker is not configured or speaker_audio is empty, return None (use default)
+        if not self.speaker or not self.speaker_audio:
+            return None
+
+        # Get the audio path for selected speaker
+        speaker_audio_path = self.speaker_audio.get(self.speaker)
+
+        # If no path configured for this speaker, return None
+        if not speaker_audio_path:
+            return None
+
+        # Validate that the file exists
+        if not os.path.exists(speaker_audio_path):
+            raise ResourceNotFoundError(
+                f"Speaker audio file not found for speaker '{self.speaker}'",
+                resource_path=speaker_audio_path,
+                details=f"Please provide a valid WAV file (minimum 6 seconds) at: {speaker_audio_path}"
+            )
+
+        return speaker_audio_path
 
     def generate(self, scene: Scene, output_dir: str) -> str:
         """
@@ -116,15 +149,27 @@ class TTSGenerator:
             try:
                 # Check if model is multilingual (XTTS)
                 if "xtts" in self.model_name.lower():
-                    # XTTS requires speaker parameter
-                    # Use default speaker "Claribel Dervla" for English-like quality
-                    self.tts.tts_to_file(
-                        text=scene.text,
-                        file_path=output_path,
-                        language=self.language,
-                        speaker="Claribel Dervla"  # Default XTTS speaker
-                    )
+                    # XTTS supports voice cloning with reference audio
+                    speaker_audio_path = self._get_speaker_audio_path()
+
+                    if speaker_audio_path:
+                        # Use voice cloning with reference audio
+                        self.tts.tts_to_file(
+                            text=scene.text,
+                            file_path=output_path,
+                            language=self.language,
+                            speaker_wav=speaker_audio_path
+                        )
+                    else:
+                        # Fallback to default XTTS speaker
+                        self.tts.tts_to_file(
+                            text=scene.text,
+                            file_path=output_path,
+                            language=self.language,
+                            speaker="Claribel Dervla"
+                        )
                 else:
+                    # Non-XTTS models
                     self.tts.tts_to_file(
                         text=scene.text,
                         file_path=output_path

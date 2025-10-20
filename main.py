@@ -115,6 +115,26 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        '--speaker',
+        type=str,
+        choices=['default', 'male_deep', 'female_soft', 'custom'],
+        help='Выбор голоса: default (стандартный), male_deep (мужской брутальный), female_soft (женский мягкий), custom (путь в --speaker-audio)'
+    )
+
+    parser.add_argument(
+        '--speaker-audio',
+        type=str,
+        help='Путь к custom reference audio файлу для voice cloning (WAV, минимум 6 секунд). Используется с --speaker custom'
+    )
+
+    parser.add_argument(
+        '--image-mode',
+        type=str,
+        choices=['random', 'ordered'],
+        help='Режим выбора изображений: random (случайный) или ordered (по порядку имен файлов)'
+    )
+
+    parser.add_argument(
         '--music-volume',
         type=float,
         help='Громкость фоновой музыки (0.0 - 1.0)'
@@ -222,6 +242,21 @@ def apply_cli_overrides(config: dict, args, logger):
     if args.language:
         config['tts']['language'] = args.language
         logger.info(f"Override: language = {args.language}")
+
+    # Speaker
+    if args.speaker:
+        config['tts']['speaker'] = args.speaker
+        logger.info(f"Override: speaker = {args.speaker}")
+
+    # Custom speaker audio
+    if args.speaker_audio:
+        config['tts']['speaker_audio']['custom'] = args.speaker_audio
+        logger.info(f"Override: custom speaker audio = {args.speaker_audio}")
+
+    # Image mode
+    if args.image_mode:
+        config['visuals']['selection_mode'] = args.image_mode
+        logger.info(f"Override: image selection mode = {args.image_mode}")
 
     # Music volume
     if args.music_volume is not None:
@@ -391,31 +426,11 @@ def run_pipeline(script_path: str, output_path: str, config: dict, logger):
     print()
 
     # -------------------------------------------------------------------------
-    # STEP 3: Generate subtitles for each scene
+    # STEP 3: Select and scale images for each scene
     # -------------------------------------------------------------------------
-    print("📝 STEP 3/7: Generating subtitles...")
-    logger.info("STEP 3/7: Generating subtitles")
-
-    if config['subtitles']['enabled']:
-        subtitle_generator = SubtitleGenerator(config)
-        subtitle_output_dir = temp_dir / "subtitles"
-        subtitle_output_dir.mkdir(exist_ok=True)
-
-        subtitle_generator.batch_generate(scenes, str(subtitle_output_dir))
-
-        logger.info(f"Subtitle generation complete")
-        print(f"   ✓ Subtitles generated (max {config['subtitles']['max_chars_per_line']} chars/line)")
-    else:
-        logger.info("Subtitles disabled in configuration")
-        print("   ⊘ Subtitles disabled")
-
-    print()
-
-    # -------------------------------------------------------------------------
-    # STEP 4: Select and scale images for each scene
-    # -------------------------------------------------------------------------
-    print("🖼️  STEP 4/7: Selecting and scaling images...")
-    logger.info("STEP 4/7: Selecting and scaling images")
+    print("🖼️  STEP 3/7: Selecting and scaling images...")
+    logger.info("STEP 3/7: Selecting and scaling images")
+    logger.info(f"Image selection mode: {config['visuals']['selection_mode']}")
 
     visual_selector = VisualSelector(config)
     images_dir = config['visuals']['images_dir']
@@ -430,8 +445,34 @@ def run_pipeline(script_path: str, output_path: str, config: dict, logger):
 
     visual_selector.batch_process(scenes, images_dir, str(image_output_dir))
 
+    # Recalculate total duration (may have changed if custom durations specified in filenames)
+    total_duration = sum(scene.duration for scene in scenes)
+
     logger.info(f"Image processing complete. Resolution: {target_resolution[0]}x{target_resolution[1]}")
     print(f"   ✓ Images scaled to {target_resolution[0]}x{target_resolution[1]} ({config['video']['aspect_ratio']})")
+    if config['visuals']['selection_mode'] == 'ordered':
+        print(f"   ℹ️  Images selected in ordered mode by filename")
+    print()
+
+    # -------------------------------------------------------------------------
+    # STEP 4: Generate subtitles for each scene
+    # -------------------------------------------------------------------------
+    print("📝 STEP 4/7: Generating subtitles...")
+    logger.info("STEP 4/7: Generating subtitles")
+
+    if config['subtitles']['enabled']:
+        subtitle_generator = SubtitleGenerator(config)
+        subtitle_output_dir = temp_dir / "subtitles"
+        subtitle_output_dir.mkdir(exist_ok=True)
+
+        subtitle_generator.batch_generate(scenes, str(subtitle_output_dir))
+
+        logger.info(f"Subtitle generation complete")
+        print(f"   ✓ Subtitles generated (max {config['subtitles']['max_chars_per_line']} chars/line)")
+    else:
+        logger.info("Subtitles disabled in configuration")
+        print("   ⊘ Subtitles disabled")
+
     print()
 
     # -------------------------------------------------------------------------
@@ -468,15 +509,10 @@ def run_pipeline(script_path: str, output_path: str, config: dict, logger):
             output_dir=str(music_output_dir)
         )
 
-        # Adjust volume
-        music_path = music_selector.adjust_volume(
-            music_path,
-            volume_level=config['audio']['music']['volume'],
-            output_dir=str(music_output_dir)
-        )
-
-        logger.info(f"Music processed: duration={total_duration:.2f}s, volume={config['audio']['music']['volume']}")
-        print(f"   ✓ Music processed (volume: {config['audio']['music']['volume']})")
+        # NOTE: Volume is applied in VideoAssembler, not here (to avoid double application)
+        logger.info(f"Music processed: duration={total_duration:.2f}s, fade_in={config['audio']['music']['fade_in']}s, fade_out={config['audio']['music']['fade_out']}s")
+        logger.info(f"Music will be mixed with volume={config['audio']['music']['volume']} in video assembly")
+        print(f"   ✓ Music processed (duration: {total_duration:.2f}s)")
     else:
         logger.info("Music disabled in configuration")
         print("   ⊘ Music disabled")

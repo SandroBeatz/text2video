@@ -12,7 +12,18 @@ tts:
   models:
     multilingual: "tts_models/multilingual/multi-dataset/xtts_v2"
     en: "tts_models/en/ljspeech/vits"
-  speed: 1.0  # Скорость речи (0.5 - 2.0)
+  speed: 1.5  # Скорость речи (0.5 - 2.0)
+
+  # Выбор голоса для озвучки
+  speaker: "male_deep"  # default | male_deep | female_soft | custom
+
+  # Пути к reference audio файлам для voice cloning (XTTS v2)
+  # Каждый файл должен быть WAV, минимум 6 секунд
+  speaker_audio:
+    default: "./assets/speakers/default.wav"      # Стандартный голос (Claribel Dervla)
+    male_deep: "./assets/speakers/male_deep.wav"  # Брутальный мужской голос для историй
+    female_soft: "./assets/speakers/female_soft.wav"  # Мягкий женский голос
+    custom: null  # Путь к кастомному аудио файлу (указывается через CLI)
 
 # Настройки видео
 video:
@@ -20,7 +31,7 @@ video:
   resolution:
     width: 1920
     height: 1080
-  aspect_ratio: "16:9"  # 16:9 | 9:16 | 1:1
+  aspect_ratio: "9:16"  # 16:9 | 9:16 | 1:1
   codec: "libx264"
   bitrate: "5000k"
 
@@ -50,6 +61,13 @@ audio:
 visuals:
   images_dir: "./assets/images"
   default_duration: 5  # Длительность показа изображения (сек) если нет речи
+  selection_mode: "random"  # random | ordered
+  # Режим ordered: изображения выбираются по порядку имен файлов
+  # Поддерживаемые форматы имен:
+  #   - 1.jpg, 2.jpg, 3.jpg (номер сцены)
+  #   - scene-1.jpg, scene-2.jpg (номер сцены с префиксом)
+  #   - 1_5.jpg (номер сцены 1, длительность 5 секунд)
+  #   - scene-2_10.5.jpg (сцена 2, длительность 10.5 секунд)
   transition:
     enabled: false  # Переходы между сценами (будет реализовано позже)
     type: "crossfade"  # crossfade | fade | none

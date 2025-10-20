@@ -242,6 +242,71 @@ def validate_language(language: str) -> bool:
     return True
 
 
+def validate_speaker(speaker: str) -> bool:
+    """
+    Validate speaker/voice selection.
+
+    Args:
+        speaker: Speaker identifier (e.g., 'default', 'male_deep', 'female_soft', 'custom')
+
+    Returns:
+        True if speaker is valid, False otherwise
+    """
+    valid_speakers = ['default', 'male_deep', 'female_soft', 'custom']
+
+    if speaker not in valid_speakers:
+        logger.error(
+            f"Invalid speaker: {speaker}. "
+            f"Valid speakers: {', '.join(valid_speakers)}"
+        )
+        return False
+
+    return True
+
+
+def validate_speaker_audio_file(file_path: str, min_duration: float = 6.0) -> bool:
+    """
+    Validate speaker audio file for voice cloning.
+
+    Args:
+        file_path: Path to the speaker audio file
+        min_duration: Minimum audio duration in seconds (default: 6.0 for XTTS v2)
+
+    Returns:
+        True if audio file is valid, False otherwise
+    """
+    # Check file exists
+    if not validate_file_exists(file_path):
+        return False
+
+    # Check file format (must be WAV)
+    if not validate_file_format(file_path, ['.wav', '.WAV']):
+        logger.error(f"Speaker audio must be WAV format: {file_path}")
+        return False
+
+    # Try to validate duration using wave module
+    try:
+        import wave
+        with wave.open(file_path, 'r') as wav_file:
+            frames = wav_file.getnframes()
+            rate = wav_file.getframerate()
+            duration = frames / float(rate)
+
+            if duration < min_duration:
+                logger.error(
+                    f"Speaker audio is too short: {duration:.1f}s. "
+                    f"Minimum required: {min_duration}s for quality voice cloning"
+                )
+                return False
+
+            logger.debug(f"Speaker audio validated: {duration:.1f}s duration")
+            return True
+
+    except Exception as e:
+        logger.error(f"Failed to validate speaker audio file: {e}")
+        return False
+
+
 def validate_fps(fps: int) -> bool:
     """
     Validate frames per second value.
