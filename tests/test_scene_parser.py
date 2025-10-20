@@ -5,6 +5,7 @@ Tests for Scene Parser Module
 import pytest
 from pathlib import Path
 from modules.scene_parser import Scene, SceneParser
+from utils.exceptions import SceneParseError, ResourceNotFoundError
 
 
 class TestScene:
@@ -139,7 +140,7 @@ class TestSceneParser:
         """Test parsing a file that doesn't exist"""
         parser = SceneParser()
 
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(ResourceNotFoundError):
             parser.parse("/nonexistent/file.txt")
 
     def test_parse_unsupported_format(self, tmp_path):
@@ -149,7 +150,7 @@ class TestSceneParser:
 
         parser = SceneParser()
 
-        with pytest.raises(ValueError, match="Unsupported file format"):
+        with pytest.raises(SceneParseError, match="Unsupported file format"):
             parser.parse(str(test_file))
 
     def test_parse_unicode_text(self, tmp_path):

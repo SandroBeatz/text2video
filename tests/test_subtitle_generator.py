@@ -8,6 +8,7 @@ import pysrt
 from pathlib import Path
 from modules.scene_parser import Scene
 from modules.subtitle_generator import SubtitleGenerator
+from utils.exceptions import SubtitleError
 
 
 class TestSubtitleGenerator:
@@ -242,7 +243,7 @@ class TestSubtitleGenerator:
         scene = Scene(id=1, text="Test text", duration=0.0)
         output_dir = tmp_path / "subtitles"
 
-        with pytest.raises(ValueError, match="has no duration"):
+        with pytest.raises(SubtitleError, match="has no duration"):
             generator.generate(scene, str(output_dir))
 
     def test_generate_creates_output_directory(self, tmp_path):

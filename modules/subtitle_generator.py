@@ -7,6 +7,7 @@ import os
 import pysrt
 from typing import List, Tuple
 from modules.scene_parser import Scene
+from utils.exceptions import SubtitleError
 
 
 class SubtitleGenerator:
@@ -42,34 +43,53 @@ class SubtitleGenerator:
             Path to generated SRT file
 
         Raises:
-            ValueError: If scene has no duration set
-            RuntimeError: If subtitle generation fails
+            SubtitleError: If subtitle generation fails
         """
-        if scene.duration <= 0:
-            raise ValueError(
-                f"Scene {scene.id} has no duration set. "
-                "Generate audio first to calculate duration."
-            )
-
-        # Create output directory if needed
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Generate output filename
-        output_filename = f"scene_{scene.id:03d}_subtitle.srt"
-        output_path = os.path.join(output_dir, output_filename)
-
         try:
+            if scene.duration <= 0:
+                raise SubtitleError(
+                    "Scene has no duration set",
+                    scene_id=str(scene.id),
+                    details="Generate audio first to calculate duration"
+                )
+
+            # Create output directory if needed
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+            except OSError as e:
+                raise SubtitleError(
+                    f"Failed to create output directory: {output_dir}",
+                    scene_id=str(scene.id),
+                    details=str(e)
+                )
+
+            # Generate output filename
+            output_filename = f"scene_{scene.id:03d}_subtitle.srt"
+            output_path = os.path.join(output_dir, output_filename)
+
             # Calculate subtitle timings
             timings = self.calculate_timings(scene.text, scene.duration)
+
+            if not timings:
+                raise SubtitleError(
+                    "Failed to calculate subtitle timings",
+                    scene_id=str(scene.id),
+                    details="Text may be empty or invalid"
+                )
 
             # Create SRT file
             self._create_srt_file(timings, output_path)
 
             return output_path
 
+        except SubtitleError:
+            # Re-raise our custom exception
+            raise
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to generate subtitles for scene {scene.id}: {e}"
+            raise SubtitleError(
+                "Unexpected error during subtitle generation",
+                scene_id=str(scene.id),
+                details=str(e)
             )
 
     def split_into_lines(self, text: str, max_chars: int = None) -> List[str]:
