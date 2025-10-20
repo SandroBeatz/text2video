@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **Text-to-Video Generator** - An automated system that converts text scripts into video content with:
-- Local speech generation using Coqui TTS
+- Speech generation using Microsoft Edge TTS
 - Automatic subtitle generation and synchronization
 - Static background images
 - Background music integration
@@ -31,8 +31,8 @@ source venv/bin/activate  # macOS/Linux
 # Install dependencies (when requirements.txt exists)
 pip install -r requirements.txt
 
-# Initialize TTS models (after implementation)
-python main.py --init
+# View available voices
+edge-tts --list-voices
 ```
 
 ### Running the Application (Planned)
@@ -183,13 +183,16 @@ CLI arguments can override config.yaml settings.
 
 ## Key Implementation Details
 
-### TTS Model Configuration
+### TTS Configuration
 
-Supported languages and models:
-- Russian: `tts_models/ru/ruslan/fairseq_vits`
-- English: `tts_models/en/ljspeech/tacotron2-DDC`
+Uses Microsoft Edge TTS:
+- **400+ voices** on 100+ languages
+- No model download required (cloud-based)
+- Popular voices:
+  - Russian: `ru-RU-DmitryNeural`, `ru-RU-SvetlanaNeural`
+  - English: `en-US-GuyNeural`, `en-US-JennyNeural`
 
-Models are downloaded automatically on first use or via `--init` flag.
+View all voices: `edge-tts --list-voices`
 
 ### Subtitle Timing Algorithm
 
@@ -277,16 +280,15 @@ def parse_scene(text: str) -> Scene:
 ### Performance Considerations
 
 - Implement caching for TTS generation (hash-based on text + config)
-- Support batch processing where models allow
-- Use lazy loading for heavy dependencies (TTS models)
-- Consider GPU acceleration if available for TTS
+- Consider parallel TTS generation using asyncio.gather()
 - Add timing decorators to identify bottlenecks
+- Optimize video encoding settings for faster rendering
 
 ### Dependencies to Install
 
 Core dependencies (when implementing):
 ```
-TTS>=0.22.0              # Coqui TTS for speech generation
+edge-tts>=6.1.9          # Microsoft Edge TTS for speech generation
 moviepy>=1.0.3           # Video editing
 pydub>=0.25.1            # Audio processing
 pysrt>=1.1.2             # Subtitle handling
@@ -310,15 +312,15 @@ pytest-cov
 - Ensure FFmpeg is installed and in system PATH
 - Test with: `ffmpeg -version`
 
-**TTS model download fails**
-- Check internet connection
-- Models are cached in `~/.local/share/tts/` (Linux/macOS)
-- Manually download and place in cache directory if needed
+**Edge TTS connection fails**
+- Check internet connection (Edge TTS requires internet)
+- Verify no proxy/VPN blocking Microsoft services
+- Try different network
 
-**Out of memory during TTS**
+**Out of memory during video assembly**
 - Reduce scene text length (split longer paragraphs)
-- Use smaller/faster TTS model
-- Enable text chunking in TTSGenerator
+- Lower video resolution in config.yaml
+- Close other applications
 
 **Video encoding slow**
 - Reduce resolution in config.yaml

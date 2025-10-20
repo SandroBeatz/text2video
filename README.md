@@ -1,19 +1,20 @@
 # Text-to-Video Generator
 
-Автоматизированная система для создания видеороликов из текстовых сценариев с использованием локальной генерации речи, автоматических субтитров и фоновой музыки.
+Автоматизированная система для создания видеороликов из текстовых сценариев с использованием Microsoft Edge TTS, автоматических субтитров и фоновой музыки.
 
 ## 🎯 Возможности
 
-- ✅ **Локальная генерация речи** с помощью Coqui TTS (без облачных API)
+- ✅ **Генерация речи через Edge TTS** - 400+ натуральных голосов на 100+ языках
+- ✅ **Высокое качество озвучки** с нейронными голосами Microsoft
 - ✅ **Автоматическая синхронизация субтитров** с точными таймингами
 - ✅ **Поддержка различных форматов видео**: 16:9, 9:16, 1:1, 4:3, 21:9
 - ✅ **Фоновая музыка** с регулировкой громкости и fade-эффектами
 - ✅ **Настройка через YAML** конфигурацию
-- ✅ **Мощный CLI интерфейс** с 14 параметрами
-- ✅ **Многоязычность**: Русский и Английский
+- ✅ **Мощный CLI интерфейс** с гибкими параметрами
+- ✅ **Многоязычность**: Русский, Английский и другие языки
 - ✅ **Система логирования** для отладки
 - ✅ **Обработка ошибок** с информативными сообщениями
-- ✅ **247 тестов** с 99% покрытием кода
+- ✅ **245+ тестов** с 98% покрытием кода
 
 ## 🚀 Быстрый старт
 
@@ -21,7 +22,8 @@
 
 - Python 3.9+
 - FFmpeg (установлен и доступен в PATH)
-- 4-8 GB RAM
+- **Интернет-соединение** (для Edge TTS)
+- 2-4 GB RAM
 
 ### Установка
 
@@ -62,10 +64,10 @@ python main.py -i script.txt --no-music
 python main.py -i script.txt --language en
 
 # Выбрать голос для озвучки
-python main.py -i script.txt --speaker male_deep
+python main.py -i script.txt --voice en-US-JennyNeural
 
-# Использовать кастомный голос
-python main.py -i script.txt --speaker custom --speaker-audio path/to/voice.wav
+# Использовать женский русский голос
+python main.py -i script.txt --voice ru-RU-SvetlanaNeural
 
 # Использовать изображения по порядку (по именам файлов)
 python main.py -i script.txt --image-mode ordered
@@ -90,15 +92,13 @@ python main.py -i script.txt --log-level DEBUG
 | `--aspect-ratio` | - | Соотношение сторон видео | `16:9` |
 | `--resolution` | - | Разрешение видео (ШxВ) | `1920x1080` |
 | `--language` | - | Язык озвучки (ru/en) | `ru` |
-| `--speaker` | - | Выбор голоса (default/male_deep/female_soft/custom) | `default` |
-| `--speaker-audio` | - | Путь к reference audio для custom голоса | - |
+| `--voice` | - | Имя голоса Edge TTS (например: ru-RU-DmitryNeural) | `ru-RU-DmitryNeural` |
 | `--image-mode` | - | Режим выбора изображений (random/ordered) | `random` |
 | `--music-volume` | - | Громкость музыки (0.0-1.0) | `0.2` |
 | `--no-music` | - | Отключить фоновую музыку | `false` |
 | `--no-subtitles` | - | Отключить субтитры | `false` |
 | `--log-level` | - | Уровень логирования | `INFO` |
 | `--quiet` | - | Минимальный вывод | `false` |
-| `--init` | - | Инициализировать TTS модели | `false` |
 | `--version` | - | Показать версию | - |
 | `--help` | `-h` | Показать справку | - |
 
@@ -175,49 +175,63 @@ audio:
     volume: 0.2  # Громкость относительно речи
 ```
 
-## 🎙️ Выбор голоса (Voice Cloning)
+## 🎙️ Выбор голоса (Edge TTS)
 
-Система поддерживает выбор различных голосов для озвучки с использованием технологии voice cloning от Coqui TTS XTTS v2.
+Система использует Microsoft Edge TTS с **400+ натуральными голосами** на 100+ языках.
 
-### Доступные голоса
+### Популярные голоса
 
-- **default** - Стандартный голос XTTS v2 (встроенный, не требует настройки)
-- **male_deep** - Брутальный мужской голос для историй и повествования
-- **female_soft** - Мягкий женский голос для обучающего контента
-- **custom** - Ваш собственный голос (укажите path к WAV файлу)
+#### Русские голоса:
+- **ru-RU-DmitryNeural** (мужской) - стандартный, четкий голос
+- **ru-RU-SvetlanaNeural** (женский) - мягкий, естественный
+- **ru-RU-DariyaNeural** (женский) - яркий, четкий
+
+#### Английские голоса:
+- **en-US-GuyNeural** (мужской) - дружелюбный, легкий
+- **en-US-JennyNeural** (женский) - приятный, естественный
+- **en-GB-RyanNeural** (британский мужской) - яркий, выразительный
 
 ### Использование
 
 #### Через CLI:
 ```bash
-# Использовать мужской брутальный голос
-python main.py -i story.txt --speaker male_deep
+# Мужской русский голос
+python main.py -i story.txt --voice ru-RU-DmitryNeural
 
-# Использовать женский мягкий голос
-python main.py -i tutorial.txt --speaker female_soft
+# Женский русский голос
+python main.py -i tutorial.txt --voice ru-RU-SvetlanaNeural
 
-# Использовать свой кастомный голос
-python main.py -i script.txt --speaker custom --speaker-audio path/to/my_voice.wav
+# Женский английский голос
+python main.py -i script_en.txt --voice en-US-JennyNeural
+
+# Просмотреть все доступные голоса
+edge-tts --list-voices | grep ru-RU
 ```
 
 #### Через config.yaml:
 ```yaml
 tts:
   language: "ru"
-  speaker: "male_deep"  # default | male_deep | female_soft | custom
-  speaker_audio:
-    male_deep: "./assets/speakers/male_deep.wav"
-    female_soft: "./assets/speakers/female_soft.wav"
-    custom: null  # Указывается через CLI
+  voice: "ru-RU-DmitryNeural"
+  speed: 1.7  # Скорость речи (0.5 - 2.0)
 ```
 
-### Добавление своего голоса
+### Просмотр всех голосов
 
-1. **Запишите аудио**: WAV формат, минимум 6 секунд, чистая запись без шумов
-2. **Сохраните файл**: В директорию `assets/speakers/` с именем `male_deep.wav` или `female_soft.wav`
-3. **Используйте**: Укажите `--speaker male_deep` при запуске
+Чтобы увидеть полный список доступных голосов:
 
-Подробные инструкции см. в `assets/speakers/README.md`
+```bash
+# Все голоса
+edge-tts --list-voices
+
+# Только русские
+edge-tts --list-voices | grep ru-RU
+
+# Только английские
+edge-tts --list-voices | grep en-US
+```
+
+Полный список голосов также доступен в [документации Microsoft](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support)
 
 ## 🖼️ Управление порядком изображений
 
@@ -323,11 +337,10 @@ sudo apt-get install ffmpeg
 # Скачать с https://ffmpeg.org/download.html и добавить в PATH
 ```
 
-### Ошибка загрузки TTS модели
-```bash
-# Инициализировать модели вручную
-python main.py --init
-```
+### Ошибка подключения к Edge TTS
+- Проверьте интернет-соединение
+- Убедитесь, что не используется прокси или VPN, блокирующий Microsoft
+- Попробуйте другую сеть
 
 ### Недостаточно памяти
 - Уменьшите разрешение видео в config.yaml
@@ -342,10 +355,11 @@ python main.py --init
 ## 📊 Технические характеристики
 
 - **Языки программирования**: Python 3.11
+- **TTS**: Microsoft Edge TTS (400+ голосов)
 - **Модулей**: 6 основных + 2 утилитарных
-- **Тестов**: 247 (244 проходят без загрузки TTS моделей)
-- **Покрытие кода**: ~99%
-- **Строк кода**: ~3500
+- **Тестов**: 245+ (243 проходят успешно)
+- **Покрытие кода**: ~98%
+- **Строк кода**: ~3400
 - **Поддержка**: macOS, Linux, Windows
 
 ## 🛠️ Статус разработки

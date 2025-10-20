@@ -1,26 +1,21 @@
 """
 TTS Generator Module
-Handles text-to-speech generation using Coqui TTS
+Handles text-to-speech generation using Microsoft Edge TTS
 """
 
 import os
-import wave
+import asyncio
 from pathlib import Path
 from typing import Optional
+from pydub import AudioSegment
 from modules.scene_parser import Scene
 from utils.exceptions import TTSError, DependencyError, ResourceNotFoundError
 
 
 class TTSGenerator:
     """
-    Text-to-Speech generator using Coqui TTS
+    Text-to-Speech generator using Microsoft Edge TTS
     """
-
-    # Supported TTS models
-    MODELS = {
-        "multilingual": "tts_models/multilingual/multi-dataset/xtts_v2",
-        "en": "tts_models/en/ljspeech/vits"
-    }
 
     def __init__(self, config: dict):
         """
@@ -30,80 +25,68 @@ class TTSGenerator:
             config: Configuration dictionary with TTS settings
         """
         self.config = config
-        self.language = config.get('tts', {}).get('language', 'ru')
-        self.speed = config.get('tts', {}).get('speed', 1.0)
-        self.speaker = config.get('tts', {}).get('speaker', 'default')
-        self.speaker_audio = config.get('tts', {}).get('speaker_audio', {})
+        tts_config = config.get('tts', {})
 
-        # Get model name for the language
-        models = config.get('tts', {}).get('models', self.MODELS)
+        self.language = tts_config.get('language', 'ru')
+        self.speed = tts_config.get('speed', 1.0)
+        self.voice = tts_config.get('voice', 'ru-RU-DmitryNeural')
 
-        # Use multilingual model for Russian, language-specific for others
-        if self.language == 'ru':
-            self.model_name = models.get('multilingual', self.MODELS['multilingual'])
-        else:
-            self.model_name = models.get(self.language, self.MODELS.get(self.language, self.MODELS['multilingual']))
-
-        # Lazy initialization - TTS model will be loaded on first use
-        self.tts = None
-
-    def _initialize_tts(self):
-        """
-        Initialize TTS model (lazy loading)
-
-        Raises:
-            DependencyError: If TTS library is not installed
-            TTSError: If TTS model initialization fails
-        """
-        if self.tts is None:
-            try:
-                from TTS.api import TTS
-            except ImportError:
-                raise DependencyError(
-                    "TTS library not installed",
-                    dependency="TTS",
-                    details="Install with: pip install TTS>=0.22.0"
-                )
-
-            try:
-                self.tts = TTS(model_name=self.model_name)
-            except Exception as e:
-                raise TTSError(
-                    f"Failed to initialize TTS model: {self.model_name}",
-                    language=self.language,
-                    details=str(e)
-                )
-
-    def _get_speaker_audio_path(self) -> Optional[str]:
-        """
-        Get the path to speaker audio file based on selected speaker
-
-        Returns:
-            Path to speaker audio file, or None if using default XTTS speaker
-
-        Raises:
-            ResourceNotFoundError: If speaker audio file doesn't exist
-        """
-        # If speaker is not configured or speaker_audio is empty, return None (use default)
-        if not self.speaker or not self.speaker_audio:
-            return None
-
-        # Get the audio path for selected speaker
-        speaker_audio_path = self.speaker_audio.get(self.speaker)
-
-        # If no path configured for this speaker, return None
-        if not speaker_audio_path:
-            return None
-
-        # Validate that the file exists
-        if not os.path.exists(speaker_audio_path):
-            raise ResourceNotFoundError(
-                f"Speaker audio file not found for speaker '{self.speaker}'",
-                resource_path=speaker_audio_path,
-                details=f"Please provide a valid WAV file (minimum 6 seconds) at: {speaker_audio_path}"
+        # Validate Edge TTS is available
+        try:
+            import edge_tts
+            self.edge_tts = edge_tts
+        except ImportError:
+            raise DependencyError(
+                "edge-tts library not installed",
+                dependency="edge-tts",
+                details="Install with: pip install edge-tts>=6.1.9"
             )
 
-        return speaker_audio_path
+    def _format_rate(self, speed: float) -> str:
+        """
+        Convert speed multiplier to Edge TTS rate format
+
+        Args:
+            speed: Speed multiplier (e.g., 1.7 = 170% speed)
+
+        Returns:
+            Rate string (e.g., "+70%" for speed=1.7)
+
+        Examples:
+            0.5 -> "-50%"
+            1.0 -> "+0%"
+            1.5 -> "+50%"
+            2.0 -> "+100%"
+        """
+        percentage = int((speed - 1.0) * 100)
+        sign = "+" if percentage >= 0 else ""
+        return f"{sign}{percentage}%"
+
+    async def _generate_async(self, text: str, output_path: str) -> None:
+        """
+        Async wrapper for Edge TTS generation
+
+        Args:
+            text: Text to convert to speech
+            output_path: Path where to save the generated audio
+
+        Raises:
+            TTSError: If TTS generation fails
+        """
+        try:
+            rate = self._format_rate(self.speed)
+            communicate = self.edge_tts.Communicate(
+                text=text,
+                voice=self.voice,
+                rate=rate
+            )
+            await communicate.save(output_path)
+        except Exception as e:
+            raise TTSError(
+                f"Edge TTS generation failed",
+                language=self.language,
+                details=str(e)
+            )
 
     def generate(self, scene: Scene, output_dir: str) -> str:
         """
@@ -120,9 +103,6 @@ class TTSGenerator:
             TTSError: If TTS generation fails
         """
         try:
-            # Ensure TTS is initialized
-            self._initialize_tts()
-
             # Create output directory if it doesn't exist
             try:
                 os.makedirs(output_dir, exist_ok=True)
@@ -141,39 +121,13 @@ class TTSGenerator:
                     details="Cannot generate audio for empty text"
                 )
 
-            # Generate output filename
-            output_filename = f"scene_{scene.id:03d}_audio.wav"
+            # Generate output filename (MP3 instead of WAV)
+            output_filename = f"scene_{scene.id:03d}_audio.mp3"
             output_path = os.path.join(output_dir, output_filename)
 
-            # Generate speech
+            # Generate speech using async Edge TTS
             try:
-                # Check if model is multilingual (XTTS)
-                if "xtts" in self.model_name.lower():
-                    # XTTS supports voice cloning with reference audio
-                    speaker_audio_path = self._get_speaker_audio_path()
-
-                    if speaker_audio_path:
-                        # Use voice cloning with reference audio
-                        self.tts.tts_to_file(
-                            text=scene.text,
-                            file_path=output_path,
-                            language=self.language,
-                            speaker_wav=speaker_audio_path
-                        )
-                    else:
-                        # Fallback to default XTTS speaker
-                        self.tts.tts_to_file(
-                            text=scene.text,
-                            file_path=output_path,
-                            language=self.language,
-                            speaker="Claribel Dervla"
-                        )
-                else:
-                    # Non-XTTS models
-                    self.tts.tts_to_file(
-                        text=scene.text,
-                        file_path=output_path
-                    )
+                asyncio.run(self._generate_async(scene.text, output_path))
             except Exception as e:
                 raise TTSError(
                     f"Audio generation failed for scene {scene.id}",
@@ -207,7 +161,7 @@ class TTSGenerator:
         Get duration of an audio file in seconds
 
         Args:
-            audio_path: Path to the WAV audio file
+            audio_path: Path to the audio file (MP3 or WAV)
 
         Returns:
             Duration in seconds
@@ -224,23 +178,12 @@ class TTSGenerator:
             )
 
         try:
-            with wave.open(audio_path, 'r') as wav_file:
-                frames = wav_file.getnframes()
-                rate = wav_file.getframerate()
-
-                if rate == 0:
-                    raise TTSError(
-                        "Invalid audio file - framerate is zero",
-                        details=f"File: {audio_path}"
-                    )
-
-                duration = frames / float(rate)
-                return duration
+            # Use pydub to handle both MP3 and WAV files
+            audio = AudioSegment.from_file(audio_path)
+            duration = len(audio) / 1000.0  # Convert milliseconds to seconds
+            return duration
 
         except ResourceNotFoundError:
-            # Re-raise
-            raise
-        except TTSError:
             # Re-raise
             raise
         except Exception as e:

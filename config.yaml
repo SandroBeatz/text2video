@@ -7,23 +7,23 @@ project:
   output_dir: "./output"
 
 # Настройки TTS (Text-to-Speech)
+# Используется Microsoft Edge TTS с 400+ натуральными голосами
 tts:
   language: "ru"  # ru | en
-  models:
-    multilingual: "tts_models/multilingual/multi-dataset/xtts_v2"
-    en: "tts_models/en/ljspeech/vits"
+
+  # Голос для озвучки (полный список: edge-tts --list-voices)
+  voice: "ru-RU-DmitryNeural"  # Мужской русский голос
+
+  # Популярные русские голоса:
+  #   - ru-RU-DmitryNeural (мужской)
+  #   - ru-RU-SvetlanaNeural (женский)
+  #   - ru-RU-DariyaNeural (женский)
+  # Популярные английские голоса:
+  #   - en-US-GuyNeural (мужской)
+  #   - en-US-JennyNeural (женский)
+  #   - en-GB-RyanNeural (британский мужской)
+
   speed: 1.7  # Скорость речи (0.5 - 2.0)
-
-  # Выбор голоса для озвучки
-  speaker: "default"  # default | male_deep | female_soft | custom
-
-  # Пути к reference audio файлам для voice cloning (XTTS v2)
-  # Каждый файл должен быть WAV, минимум 6 секунд
-  speaker_audio:
-    default: "./assets/speakers/default.wav"      # Стандартный голос (Claribel Dervla)
-    male_deep: "./assets/speakers/male_deep.wav"  # Брутальный мужской голос для историй
-    female_soft: "./assets/speakers/female_soft.wav"  # Мягкий женский голос
-    custom: null  # Путь к кастомному аудио файлу (указывается через CLI)
 
 # Настройки видео
 video:

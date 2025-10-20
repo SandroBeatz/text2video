@@ -1,6 +1,33 @@
 # Speaker Audio Files / Аудиофайлы для голосов
 
-Эта директория содержит reference audio файлы для voice cloning с помощью Coqui TTS XTTS v2.
+⚠️ **DEPRECATED / УСТАРЕЛО**
+
+**Дата deprecation**: 20 октября 2025
+
+**Причина**: Проект мигрировал с Coqui TTS на Microsoft Edge TTS.
+
+**Что это значит:**
+- Voice cloning больше не поддерживается
+- Эта директория и файлы в ней больше не используются
+- Вместо этого доступны **400+ предустановленных голосов Microsoft** на 100+ языках
+
+**Как выбрать голос сейчас:**
+```bash
+# Посмотреть все доступные голоса
+edge-tts --list-voices
+
+# Использовать голос
+python main.py -i script.txt --voice ru-RU-DmitryNeural
+python main.py -i script.txt --voice en-US-JennyNeural
+```
+
+Подробности см. в [README.md](../../README.md) в секции "🎙️ Выбор голоса (Edge TTS)".
+
+---
+
+## УСТАРЕВШАЯ ИНФОРМАЦИЯ НИЖЕ
+
+Эта директория содержала reference audio файлы для voice cloning с помощью Coqui TTS XTTS v2.
 
 ## Требования к аудиофайлам
 

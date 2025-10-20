@@ -63,14 +63,10 @@ class TestSceneParserTTSIntegration:
             assert scene.audio_path is None
             assert scene.duration == 0.0
 
-    @pytest.mark.skipif(
-        not os.path.exists('./venv/lib/python3.11/site-packages/TTS'),
-        reason="TTS library not installed"
-    )
     def test_full_pipeline_with_tts(self, config, test_script_path, tmp_path):
         """
         Test full pipeline: parse text -> generate audio -> verify results
-        (requires TTS installed)
+        (uses Edge TTS - requires internet connection)
         """
         # Parse the script
         parser = SceneParser()
@@ -97,8 +93,8 @@ class TestSceneParserTTSIntegration:
             # Check duration is set and positive
             assert scene.duration > 0
 
-            # Check filename format
-            assert f"scene_{scene.id:03d}_audio.wav" in scene.audio_path
+            # Check filename format (MP3 for Edge TTS)
+            assert f"scene_{scene.id:03d}_audio.mp3" in scene.audio_path
 
     def test_scene_metadata_preservation(self, test_script_path):
         """Test that scene metadata is preserved during processing"""
@@ -160,14 +156,10 @@ class TestSceneParserTTSIntegration:
         assert "English" in scenes[1].text
         assert "中文" in scenes[2].text
 
-    @pytest.mark.skipif(
-        not os.path.exists('./venv/lib/python3.11/site-packages/TTS'),
-        reason="TTS library not installed"
-    )
     def test_russian_text_with_tts(self, config, tmp_path):
         """
         Test Russian text parsing and audio generation
-        (requires TTS installed and model downloaded)
+        (uses Edge TTS - requires internet connection)
         """
         # Create Russian script
         russian_script = tmp_path / "russian.txt"
@@ -183,7 +175,7 @@ class TestSceneParserTTSIntegration:
 
         assert len(scenes) == 2
 
-        # Generate audio (will use multilingual XTTS model)
+        # Generate audio (will use Edge TTS with ru-RU voice)
         output_dir = tmp_path / "russian_audio"
         output_dir.mkdir()
 
@@ -301,10 +293,7 @@ class TestFullPipelineIntegration:
             assert scene.image_path is not None
             assert os.path.exists(scene.image_path)
 
-    @pytest.mark.skipif(
-        not os.path.exists('./venv/lib/python3.11/site-packages/TTS'),
-        reason="TTS library not installed - full pipeline test requires TTS"
-    )
+    @pytest.mark.skip(reason="Skip full pipeline test with TTS - requires internet")
     def test_full_pipeline_with_tts(self, config, test_script_path,
                                     test_images_dir, test_music_dir, tmp_path):
         """
@@ -312,9 +301,11 @@ class TestFullPipelineIntegration:
         All 7 steps: Parse -> TTS -> Subtitles -> Visuals -> Music -> Assembly
 
         This test requires:
-        - TTS library installed
-        - TTS models downloaded
+        - edge-tts library installed
+        - Internet connection (for Edge TTS)
         - FFmpeg installed
+
+        Note: Skipped by default to avoid internet dependency in tests
         """
         # Adjust config to use test resources
         config['visuals']['images_dir'] = test_images_dir

@@ -49,8 +49,8 @@ def parse_arguments():
   # На английском языке
   python main.py -i script_en.txt --language en
 
-  # Только загрузить TTS модели
-  python main.py --init
+  # С выбором другого голоса
+  python main.py -i script.txt --voice ru-RU-SvetlanaNeural
 
 Дополнительная информация:
   - Редактируйте config.yaml для настройки параметров по умолчанию
@@ -115,16 +115,9 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        '--speaker',
+        '--voice',
         type=str,
-        choices=['default', 'male_deep', 'female_soft', 'custom'],
-        help='Выбор голоса: default (стандартный), male_deep (мужской брутальный), female_soft (женский мягкий), custom (путь в --speaker-audio)'
-    )
-
-    parser.add_argument(
-        '--speaker-audio',
-        type=str,
-        help='Путь к custom reference audio файлу для voice cloning (WAV, минимум 6 секунд). Используется с --speaker custom'
+        help='Имя голоса Edge TTS (например: ru-RU-DmitryNeural, en-US-JennyNeural). Используйте "edge-tts --list-voices" для просмотра всех доступных голосов'
     )
 
     parser.add_argument(
@@ -156,12 +149,6 @@ def parse_arguments():
 
     # Special modes
     parser.add_argument(
-        '--init',
-        action='store_true',
-        help='Загрузить TTS модели и выйти'
-    )
-
-    parser.add_argument(
         '--version',
         action='version',
         version='Text2Video Generator v1.0.0'
@@ -169,9 +156,9 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    # Validate: either --input or --init must be provided
-    if not args.init and not args.input:
-        parser.error("аргумент -i/--input обязателен (или используйте --init для загрузки моделей)")
+    # Validate: --input must be provided
+    if not args.input:
+        parser.error("аргумент -i/--input обязателен")
 
     return args
 
@@ -243,15 +230,10 @@ def apply_cli_overrides(config: dict, args, logger):
         config['tts']['language'] = args.language
         logger.info(f"Override: language = {args.language}")
 
-    # Speaker
-    if args.speaker:
-        config['tts']['speaker'] = args.speaker
-        logger.info(f"Override: speaker = {args.speaker}")
-
-    # Custom speaker audio
-    if args.speaker_audio:
-        config['tts']['speaker_audio']['custom'] = args.speaker_audio
-        logger.info(f"Override: custom speaker audio = {args.speaker_audio}")
+    # Voice (Edge TTS)
+    if args.voice:
+        config['tts']['voice'] = args.voice
+        logger.info(f"Override: voice = {args.voice}")
 
     # Image mode
     if args.image_mode:
@@ -294,58 +276,6 @@ def ensure_directories(config: dict, logger):
         Path(dir_path).mkdir(parents=True, exist_ok=True)
 
     logger.debug("All necessary directories ensured")
-
-
-def init_tts_models(config: dict, logger):
-    """
-    Initialize TTS models (download if needed)
-
-    Args:
-        config: Configuration dictionary
-        logger: Logger instance
-    """
-    logger.info("=" * 70)
-    logger.info("TTS Models Initialization")
-    logger.info("=" * 70)
-
-    try:
-        from TTS.api import TTS
-
-        models_to_load = []
-
-        # Add configured models
-        if 'multilingual' in config['tts']['models']:
-            models_to_load.append(('multilingual', config['tts']['models']['multilingual']))
-
-        if 'en' in config['tts']['models']:
-            models_to_load.append(('en', config['tts']['models']['en']))
-
-        for model_name, model_path in models_to_load:
-            logger.info(f"Loading model '{model_name}': {model_path}")
-            print(f"\n📥 Downloading/loading {model_name} model...")
-            print(f"   {model_path}")
-            print()
-
-            TTS(model_path)
-
-            logger.info(f"✓ Model '{model_name}' loaded successfully")
-            print(f"✓ {model_name} model ready\n")
-
-        logger.info("=" * 70)
-        logger.info("✓ All TTS models initialized successfully")
-        logger.info("=" * 70)
-        print("\n✅ All TTS models are ready!")
-        print("You can now run the pipeline without waiting for model downloads.\n")
-
-    except ImportError:
-        logger.error("TTS library not installed. Install with: pip install TTS")
-        print("❌ Error: TTS library not installed")
-        print("   Install with: pip install TTS")
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Failed to initialize TTS models: {e}")
-        print(f"❌ Error initializing TTS models: {e}")
-        sys.exit(1)
 
 
 def run_pipeline(script_path: str, output_path: str, config: dict, logger):
@@ -411,6 +341,7 @@ def run_pipeline(script_path: str, output_path: str, config: dict, logger):
     print("🎤 STEP 2/7: Generating audio (TTS)...")
     logger.info("STEP 2/7: Generating audio with TTS")
     logger.info(f"Language: {config['tts']['language']}")
+    logger.info(f"Voice: {config['tts']['voice']}")
 
     tts_generator = TTSGenerator(config)
     audio_output_dir = temp_dir / "audio"
@@ -418,6 +349,7 @@ def run_pipeline(script_path: str, output_path: str, config: dict, logger):
 
     # Use batch_generate with progress bar
     print(f"   Language: {config['tts']['language']}")
+    print(f"   Voice: {config['tts']['voice']}")
     tts_generator.batch_generate(scenes, str(audio_output_dir))
 
     total_duration = sum(scene.duration for scene in scenes)
@@ -602,18 +534,6 @@ def main():
 
     # Initialize logger (will be reconfigured after loading config)
     logger = setup_logger(log_level=log_level)
-
-    # Handle --init mode
-    if args.init:
-        # Load config first
-        config = load_config(args.config, logger)
-
-        # Reconfigure logger with config
-        logger = setup_logger(config, log_level=log_level)
-
-        # Initialize TTS models
-        init_tts_models(config, logger)
-        return 0
 
     # Load configuration
     config = load_config(args.config, logger)

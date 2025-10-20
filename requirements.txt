@@ -1,7 +1,7 @@
 # Text-to-Video Generator - Production Dependencies
 
 # TTS (Text-to-Speech)
-TTS>=0.22.0
+edge-tts>=6.1.9
 
 # Video Processing
 moviepy>=1.0.3
